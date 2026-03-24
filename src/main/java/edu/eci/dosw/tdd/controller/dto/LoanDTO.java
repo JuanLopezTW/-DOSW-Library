@@ -1,5 +1,6 @@
 package edu.eci.dosw.tdd.controller.dto;
 
+import edu.eci.dosw.tdd.core.model.Loan.LoanStatus;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -15,6 +16,6 @@ public class LoanDTO {
     private Long userId;
     private String userName;
     private Date loanDate;
-    private String status;
+    private LoanStatus status;
     private Date returnDate;
 }

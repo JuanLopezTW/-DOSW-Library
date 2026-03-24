@@ -38,8 +38,8 @@ class LoanControllerTest {
     void testCreateLoanSuccessfully() {
         Book book = new Book("El Principito", "Antoine", 1L);
         User user = new User("Juan", 1L);
-        Loan loan = new Loan(book, user, new Date(), "ACTIVE", null);
-        LoanDTO loanDTO = new LoanDTO(1L, "El Principito", 1L, "Juan", new Date(), "ACTIVE", null);
+        Loan loan = new Loan(book, user, new Date(), Loan.LoanStatus.ACTIVE, null);
+        LoanDTO loanDTO = new LoanDTO(1L, "El Principito", 1L, "Juan", new Date(), Loan.LoanStatus.ACTIVE, null);
         when(loanService.createLoan(1L, 1L)).thenReturn(loan);
         when(loanMapper.toDTO(loan)).thenReturn(loanDTO);
         ResponseEntity<LoanDTO> response = loanController.createLoan(1L, 1L);

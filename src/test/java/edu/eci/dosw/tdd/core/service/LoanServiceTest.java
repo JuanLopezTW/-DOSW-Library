@@ -6,10 +6,16 @@ import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
 import edu.eci.dosw.tdd.core.model.Book;
 import edu.eci.dosw.tdd.core.model.Loan;
 import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.persistence.mapper.BookPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.mapper.UserPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.BookRepository;
+import edu.eci.dosw.tdd.persistence.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class LoanServiceTest {
 
@@ -24,48 +30,49 @@ class LoanServiceTest {
 
     @BeforeEach
     void setUp() {
-        bookService = new BookService();
-        userService = new UserService();
+
+        bookService = Mockito.mock(BookService.class);
+        userService = Mockito.mock(UserService.class);
         loanService = new LoanService(bookService, userService);
 
-        book1 = new Book("El Principito", "Antoine", 1L);
-        book2 = new Book("Cien Anos de Soledad", "Garcia Marquez", 2L);
-        book3 = new Book("1984", "Orwell", 3L);
-        book4 = new Book("Don Quijote", "Cervantes", 4L);
+        book1 = new Book("El Principito", "Antoine", 1L, 3);
+        book2 = new Book("Cien Anos de Soledad", "Garcia Marquez", 2L, 3);
+        book3 = new Book("1984", "Orwell", 3L, 3);
+        book4 = new Book("Don Quijote", "Cervantes", 4L, 3);
         user1 = new User("Juan", 1L);
 
-        bookService.addBook(book1, 3);
-        bookService.addBook(book2, 3);
-        bookService.addBook(book3, 3);
-        bookService.addBook(book4, 3);
-        userService.addUser(user1);
+        when(bookService.getBook(1L)).thenReturn(book1);
+        when(bookService.getBook(2L)).thenReturn(book2);
+        when(bookService.getBook(3L)).thenReturn(book3);
+        when(bookService.getBook(4L)).thenReturn(book4);
+        when(userService.getUser(1L)).thenReturn(user1);
     }
 
     @Test
     void testCreateLoanSuccessfully() {
         Loan loan = loanService.createLoan(1L, 1L);
         assertNotNull(loan);
-        assertEquals("ACTIVE", loan.getStatus());
+        assertEquals(Loan.LoanStatus.ACTIVE, loan.getStatus());
     }
 
     @Test
     void testCreateLoanDecreasesCopies() {
         loanService.createLoan(1L, 1L);
-        assertEquals(2, bookService.getAllBooks().get(book1));
+        verify(bookService, times(1)).decreaseCopy(1L);
     }
 
     @Test
     void testReturnLoanSuccessfully() {
         loanService.createLoan(1L, 1L);
         loanService.returnLoan(1L, 1L);
-        assertEquals("RETURNED", loanService.getAllLoans().get(0).getStatus());
+        assertEquals(Loan.LoanStatus.RETURNED, loanService.getAllLoans().get(0).getStatus());
     }
 
     @Test
     void testReturnLoanIncreasesCopies() {
         loanService.createLoan(1L, 1L);
         loanService.returnLoan(1L, 1L);
-        assertEquals(3, bookService.getAllBooks().get(book1));
+        verify(bookService, times(1)).increaseCopy(1L);
     }
 
     @Test
@@ -84,11 +91,13 @@ class LoanServiceTest {
 
     @Test
     void testCreateLoanUserNotFound() {
+        when(userService.getUser(99L)).thenThrow(new UserNotFoundException(99L));
         assertThrows(UserNotFoundException.class, () -> loanService.createLoan(99L, 1L));
     }
 
     @Test
     void testCreateLoanBookNotFound() {
+        when(bookService.getBook(99L)).thenThrow(new BookNotAvailableException(99L));
         assertThrows(BookNotAvailableException.class, () -> loanService.createLoan(1L, 99L));
     }
 
@@ -102,9 +111,8 @@ class LoanServiceTest {
 
     @Test
     void testCreateLoanBookNotAvailable() {
-        bookService.decreaseCopy(1L);
-        bookService.decreaseCopy(1L);
-        bookService.decreaseCopy(1L);
+        when(bookService.getBook(1L)).thenReturn(book1);
+        doThrow(new BookNotAvailableException(1L)).when(bookService).decreaseCopy(1L);
         assertThrows(BookNotAvailableException.class, () -> loanService.createLoan(1L, 1L));
     }
 }

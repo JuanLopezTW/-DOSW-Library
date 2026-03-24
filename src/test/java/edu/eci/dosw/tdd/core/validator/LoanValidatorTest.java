@@ -23,7 +23,7 @@ class LoanValidatorTest {
 
     @Test
     void testValidateLoanSuccessfully() {
-        Loan loan = new Loan(book1, user1, null, "ACTIVE", null);
+        Loan loan = new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null);
         assertDoesNotThrow(() -> loanValidator.validate(loan));
     }
 
@@ -34,13 +34,13 @@ class LoanValidatorTest {
 
     @Test
     void testValidateLoanBookNull() {
-        Loan loan = new Loan(null, user1, null, "ACTIVE", null);
+        Loan loan = new Loan(null, user1, null, Loan.LoanStatus.ACTIVE, null);
         assertThrows(IllegalArgumentException.class, () -> loanValidator.validate(loan));
     }
 
     @Test
     void testValidateLoanUserNull() {
-        Loan loan = new Loan(book1, null, null, "ACTIVE", null);
+        Loan loan = new Loan(book1, null, null, Loan.LoanStatus.ACTIVE, null);
         assertThrows(IllegalArgumentException.class, () -> loanValidator.validate(loan));
     }
 }

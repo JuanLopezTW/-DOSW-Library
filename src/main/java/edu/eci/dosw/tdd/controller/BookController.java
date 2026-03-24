@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/books")
@@ -30,22 +29,21 @@ public class BookController {
     public ResponseEntity<Void> addBook(@RequestBody BookDTO bookDTO) {
         Book book = bookMapper.toModel(bookDTO);
         bookValidator.validate(book);
-        bookService.addBook(book, bookDTO.getCopies());
+        bookService.addBook(book, bookDTO.getAvailableCopies());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @GetMapping
     public ResponseEntity<List<BookDTO>> getAllBooks() {
-        List<BookDTO> books = bookService.getAllBooks().entrySet().stream()
-                .map(entry -> bookMapper.toDTO(entry.getKey(), entry.getValue()))
+        List<BookDTO> books = bookService.getAllBooks().stream()
+                .map((Book book) -> bookMapper.toDTO(book))
                 .toList();
         return ResponseEntity.ok(books);
     }
 
+
     @GetMapping("/{id}")
     public ResponseEntity<BookDTO> getBook(@PathVariable Long id) {
-        Book book = bookService.getBook(id);
-        Integer copies = bookService.getAllBooks().get(book);
-        return ResponseEntity.ok(bookMapper.toDTO(book, copies));
+        return ResponseEntity.ok(bookMapper.toDTO(bookService.getBook(id)));
     }
 }

@@ -2,14 +2,12 @@ package edu.eci.dosw.tdd.core.service;
 
 import edu.eci.dosw.tdd.core.util.DateUtil;
 import edu.eci.dosw.tdd.core.exception.LoanLimitExeededException;
-import edu.eci.dosw.tdd.core.exception.LoanNotFoundException;
 import edu.eci.dosw.tdd.core.model.Loan;
 import edu.eci.dosw.tdd.core.model.User;
 import edu.eci.dosw.tdd.core.model.Book;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @Service
@@ -31,7 +29,7 @@ public class LoanService {
         Book book = bookService.getBook(bookId);
 
         long activeLoans = loans.stream()
-                .filter(l -> l.getUser().getId() == userId && l.getStatus().equals("ACTIVE"))
+                .filter(l -> l.getUser().getId() == userId && l.getStatus() == Loan.LoanStatus.ACTIVE)
                 .count();
 
         if (activeLoans >= MAX_LOANS) throw new LoanLimitExeededException(userId);
@@ -42,7 +40,7 @@ public class LoanService {
         loan.setBook(book);
         loan.setUser(user);
         loan.setLoanDate(DateUtil.today());
-        loan.setStatus("ACTIVE");
+        loan.setStatus(Loan.LoanStatus.ACTIVE);
         loans.add(loan);
         return loan;
     }
@@ -51,11 +49,11 @@ public class LoanService {
         Loan loan = loans.stream()
                 .filter(l -> l.getUser().getId() == userId
                         && l.getBook().getId().equals(bookId)
-                        && l.getStatus().equals("ACTIVE"))
+                        && l.getStatus() == Loan.LoanStatus.ACTIVE)
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Loan not found"));
+                .orElseThrow(() -> new RuntimeException("Prestamo no encontrado"));
 
-        loan.setStatus("RETURNED");
+        loan.setStatus(Loan.LoanStatus.RETURNED);
         loan.setReturnDate(DateUtil.today());
         bookService.increaseCopy(bookId);
     }

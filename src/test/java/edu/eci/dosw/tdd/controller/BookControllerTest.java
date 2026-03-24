@@ -12,9 +12,7 @@ import org.mockito.Mockito;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,7 +34,7 @@ class BookControllerTest {
 
     @Test
     void testGetAllBooksSuccessfully() {
-        when(bookService.getAllBooks()).thenReturn(new HashMap<>());
+        when(bookService.getAllBooks()).thenReturn(List.of());
         ResponseEntity<List<BookDTO>> response = bookController.getAllBooks();
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
@@ -44,7 +42,7 @@ class BookControllerTest {
     @Test
     void testAddBookSuccessfully() {
         BookDTO bookDTO = new BookDTO(1L, "El Principito", "Antoine", 3);
-        Book book = new Book("El Principito", "Antoine", 1L);
+        Book book = new Book("El Principito", "Antoine", 1L, 3);
         when(bookMapper.toModel(bookDTO)).thenReturn(book);
         ResponseEntity<Void> response = bookController.addBook(bookDTO);
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
@@ -52,13 +50,10 @@ class BookControllerTest {
 
     @Test
     void testGetBookSuccessfully() {
-        Book book = new Book("El Principito", "Antoine", 1L);
+        Book book = new Book("El Principito", "Antoine", 1L, 3);
         BookDTO bookDTO = new BookDTO(1L, "El Principito", "Antoine", 3);
-        Map<Book, Integer> books = new HashMap<>();
-        books.put(book, 3);
         when(bookService.getBook(1L)).thenReturn(book);
-        when(bookService.getAllBooks()).thenReturn(books);
-        when(bookMapper.toDTO(book, 3)).thenReturn(bookDTO);
+        when(bookMapper.toDTO(book)).thenReturn(bookDTO);
         ResponseEntity<BookDTO> response = bookController.getBook(1L);
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
@@ -72,7 +67,7 @@ class BookControllerTest {
     @Test
     void testAddBookValidationFails() {
         BookDTO bookDTO = new BookDTO(1L, "", "Antoine", 3);
-        Book book = new Book("", "Antoine", 1L);
+        Book book = new Book("", "Antoine", 1L, 3);
         when(bookMapper.toModel(bookDTO)).thenReturn(book);
         doThrow(new IllegalArgumentException("Book title cannot be empty"))
                 .when(bookValidator).validate(book);
