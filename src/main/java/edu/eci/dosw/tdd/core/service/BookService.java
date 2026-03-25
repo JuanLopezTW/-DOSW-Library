@@ -29,6 +29,17 @@ public class BookService {
         bookRepository.save(entity);
     }
 
+    public void updateStock(Long id, int newTotalCopies) {
+        if (!ValidationUtil.isPositive(newTotalCopies))
+            throw new IllegalArgumentException("El stock total debe ser mayor a 0");
+        BookEntity entity = bookRepository.findById(id)
+                .orElseThrow(() -> new BookNotAvailableException(id));
+        int diff = newTotalCopies - entity.getTotalCopies();
+        entity.setTotalCopies(newTotalCopies);
+        entity.setAvailableCopies(Math.max(0, entity.getAvailableCopies() + diff));
+        bookRepository.save(entity);
+    }
+
     public Book getBook(Long id) {
         return bookRepository.findById(id)
                 .map(bookMapper::toModel)
@@ -46,6 +57,9 @@ public class BookService {
     public void increaseCopy(Long id) {
         BookEntity entity = bookRepository.findById(id)
                 .orElseThrow(() -> new BookNotAvailableException(id));
+        if (entity.getAvailableCopies() >= entity.getTotalCopies()) {
+            throw new IllegalArgumentException("No se pueden devolver más copias que el total del libro");
+        }
         entity.setAvailableCopies(entity.getAvailableCopies() + 1);
         bookRepository.save(entity);
     }

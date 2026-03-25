@@ -41,7 +41,7 @@ class UserControllerTest {
 
     @Test
     void testAddUserSuccessfully() {
-        UserDTO userDTO = new UserDTO(1L, "Juan");
+        UserDTO userDTO = new UserDTO(1L, "Juan", "juanlopez", "1234", "USER");
         User user = new User("Juan", 1L);
         when(userMapper.toModel(userDTO)).thenReturn(user);
         ResponseEntity<Void> response = userController.addUser(userDTO);
@@ -51,12 +51,13 @@ class UserControllerTest {
     @Test
     void testGetUserSuccessfully() {
         User user = new User("Juan", 1L);
-        UserDTO userDTO = new UserDTO(1L, "Juan");
+        UserDTO userDTO = new UserDTO(1L, "Juan", "juanlopez", "1234", "USER");
         when(userService.getUser(1L)).thenReturn(user);
         when(userMapper.toDTO(user)).thenReturn(userDTO);
         ResponseEntity<UserDTO> response = userController.getUser(1L);
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
+
 
     @Test
     void testDeleteUserSuccessfully() {
@@ -72,7 +73,7 @@ class UserControllerTest {
 
     @Test
     void testAddUserValidationFails() {
-        UserDTO userDTO = new UserDTO(1L, "");
+        UserDTO userDTO = new UserDTO(1L, "", null, null, null);
         User user = new User("", 1L);
         when(userMapper.toModel(userDTO)).thenReturn(user);
         doThrow(new IllegalArgumentException("User name cannot be empty"))

@@ -9,7 +9,6 @@ public class BookPersistenceMapper {
 
     public BookEntity toEntity(Book book, int availableCopies) {
         BookEntity entity = new BookEntity();
-        entity.setId(book.getId());
         entity.setTitle(book.getTitle());
         entity.setAuthor(book.getAuthor());
         entity.setTotalCopies(availableCopies);

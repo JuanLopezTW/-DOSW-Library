@@ -40,7 +40,11 @@ public class BookController {
                 .toList();
         return ResponseEntity.ok(books);
     }
-
+    @PutMapping("/{id}/stock")
+    public ResponseEntity<Void> updateStock(@PathVariable Long id, @RequestParam int totalCopies) {
+        bookService.updateStock(id, totalCopies);
+        return ResponseEntity.noContent().build();
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<BookDTO> getBook(@PathVariable Long id) {

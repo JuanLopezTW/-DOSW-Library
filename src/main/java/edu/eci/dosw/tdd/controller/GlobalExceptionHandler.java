@@ -3,6 +3,7 @@ package edu.eci.dosw.tdd.controller;
 import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
 import edu.eci.dosw.tdd.core.exception.LoanLimitExeededException;
 import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
+import edu.eci.dosw.tdd.core.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +17,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BookNotAvailableException.class)
     public ResponseEntity<Map<String, Object>> handleBookNotAvailable(BookNotAvailableException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(LoanNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleLoanNotFound(LoanNotFoundException ex) {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 

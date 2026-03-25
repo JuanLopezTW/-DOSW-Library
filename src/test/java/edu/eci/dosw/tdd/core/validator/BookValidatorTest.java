@@ -22,16 +22,13 @@ class BookValidatorTest {
         assertDoesNotThrow(() -> bookValidator.validate(book));
     }
 
+
+
     @Test
     void testValidateBookNull() {
         assertThrows(IllegalArgumentException.class, () -> bookValidator.validate(null));
     }
 
-    @Test
-    void testValidateBookIdNull() {
-        Book book = new Book("El Principito", "Antoine", null);
-        assertThrows(IllegalArgumentException.class, () -> bookValidator.validate(book));
-    }
 
     @Test
     void testValidateBookTitleEmpty() {

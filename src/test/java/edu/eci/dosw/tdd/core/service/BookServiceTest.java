@@ -30,7 +30,7 @@ class BookServiceTest {
         bookService = new BookService(bookRepository, bookMapper);
 
         book1 = new Book("El Principito", "Antoine", 1L, 3);
-        bookEntity1 = new BookEntity(1L, "El Principito", "Antoine", 3, 3);
+        bookEntity1 = new BookEntity(1L, "El Principito", "Antoine", 3, 2);
     }
 
     @Test
@@ -59,20 +59,33 @@ class BookServiceTest {
     void testDecreaseCopySuccessfully() {
         when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
         bookService.decreaseCopy(1L);
-        assertEquals(2, bookEntity1.getAvailableCopies());
+        assertEquals(1, bookEntity1.getAvailableCopies());
     }
+
 
     @Test
     void testIncreaseCopySuccessfully() {
         when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
         bookService.increaseCopy(1L);
-        assertEquals(4, bookEntity1.getAvailableCopies());
+        assertEquals(3, bookEntity1.getAvailableCopies());
     }
 
     @Test
     void testGetBookNotFound() {
         when(bookRepository.findById(99L)).thenReturn(Optional.empty());
         assertThrows(BookNotAvailableException.class, () -> bookService.getBook(99L));
+    }
+
+    @Test
+    void testUpdateStockSuccessfully() {
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        bookService.updateStock(1L, 5);
+        assertEquals(5, bookEntity1.getTotalCopies());
+    }
+
+    @Test
+    void testUpdateStockInvalid() {
+        assertThrows(IllegalArgumentException.class, () -> bookService.updateStock(1L, 0));
     }
 
     @Test
@@ -92,4 +105,12 @@ class BookServiceTest {
     void testAddBookInvalidCopies() {
         assertThrows(IllegalArgumentException.class, () -> bookService.addBook(book1, 0));
     }
+
+    @Test
+    void testIncreaseCopyExceedsTotalCopies() {
+        bookEntity1 = new BookEntity(1L, "El Principito", "Antoine", 3, 3);
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        assertThrows(IllegalArgumentException.class, () -> bookService.increaseCopy(1L));
+    }
+
 }
