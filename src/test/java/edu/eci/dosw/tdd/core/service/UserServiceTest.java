@@ -1,9 +1,12 @@
 package edu.eci.dosw.tdd.core.service;
 
 import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
+import edu.eci.dosw.tdd.core.model.Loan;
 import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.persistence.entity.LoanEntity;
 import edu.eci.dosw.tdd.persistence.entity.UserEntity;
 import edu.eci.dosw.tdd.persistence.mapper.UserPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.LoanRepository;
 import edu.eci.dosw.tdd.persistence.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ class UserServiceTest {
     private UserService userService;
     private UserRepository userRepository;
     private UserPersistenceMapper userMapper;
+    private LoanRepository loanRepository;
     private User user1;
     private User user2;
     private UserEntity userEntity1;
@@ -29,7 +33,8 @@ class UserServiceTest {
     void setUp() {
         userRepository = Mockito.mock(UserRepository.class);
         userMapper = Mockito.mock(UserPersistenceMapper.class);
-        userService = new UserService(userRepository, userMapper);
+        loanRepository = Mockito.mock(LoanRepository.class);
+        userService = new UserService(userRepository, userMapper, loanRepository);
 
         user1 = new User("Juan", 1L);
         user2 = new User("Maria", 2L);
@@ -63,8 +68,18 @@ class UserServiceTest {
     @Test
     void testDeleteUserSuccessfully() {
         when(userRepository.existsById(1L)).thenReturn(true);
+        when(loanRepository.findByUserIdAndStatus(1L, Loan.LoanStatus.ACTIVE.name()))
+                .thenReturn(List.of());
         userService.deleteUser(1L);
         verify(userRepository, times(1)).deleteById(1L);
+    }
+
+    @Test
+    void testDeleteUserWithActiveLoans() {
+        when(userRepository.existsById(1L)).thenReturn(true);
+        when(loanRepository.findByUserIdAndStatus(1L, Loan.LoanStatus.ACTIVE.name()))
+                .thenReturn(List.of(new LoanEntity()));
+        assertThrows(IllegalArgumentException.class, () -> userService.deleteUser(1L));
     }
 
     @Test
