@@ -7,6 +7,7 @@ import edu.eci.dosw.tdd.core.service.BookService;
 import edu.eci.dosw.tdd.core.validator.BookValidator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class BookController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('LIBRARIAN')")
     public ResponseEntity<Void> addBook(@RequestBody BookDTO bookDTO) {
         Book book = bookMapper.toModel(bookDTO);
         bookValidator.validate(book);
@@ -34,6 +36,7 @@ public class BookController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
     public ResponseEntity<List<BookDTO>> getAllBooks() {
         List<BookDTO> books = bookService.getAllBooks().stream()
                 .map((Book book) -> bookMapper.toDTO(book))
@@ -41,12 +44,14 @@ public class BookController {
         return ResponseEntity.ok(books);
     }
     @PutMapping("/{id}/stock")
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
     public ResponseEntity<Void> updateStock(@PathVariable Long id, @RequestParam int totalCopies) {
         bookService.updateStock(id, totalCopies);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('LIBRARIAN')")
     public ResponseEntity<BookDTO> getBook(@PathVariable Long id) {
         return ResponseEntity.ok(bookMapper.toDTO(bookService.getBook(id)));
     }
