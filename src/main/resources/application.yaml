@@ -25,4 +25,10 @@ jwt:
   expiration: 86400000
 
 server:
-  port: 8080
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: password123
+    key-store-type: PKCS12
+    key-alias: dosw-library
+  port: 8443
