@@ -12,7 +12,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 @Configuration
 public class MongoConfig {
 
-    @Value("${spring.data.mongodb.uri}")
+    @Value("${spring.data.mongodb.uri:mongodb://localhost:27017/library}")
     private String mongoUri;
 
     @Bean
