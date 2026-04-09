@@ -54,6 +54,10 @@ public class LoanService {
         return loanRepository.findAll();
     }
 
+    public List<Loan> getLoansByUserAndStatus(Long userId, String status) {
+        return loanRepository.findByUserIdAndStatus(userId, status);
+    }
+
     public List<Loan> getLoansByUser(Long userId) {
         return loanRepository.findByUserId(userId);
     }
