@@ -37,6 +37,8 @@ jobs:
       SPRING_DATA_MONGODB_URI: ${{ secrets.MONGO_URI }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+      SPRING_DATA_JPA_REPOSITORIES_ENABLED: false
+      SPRING_JPA_PROPERTIES_HIBERNATE_TEMP_USE_JDBC_METADATA_DEFAULTS: false
     steps:
       - name: Checkout código
         uses: actions/checkout@v3
@@ -59,6 +61,8 @@ jobs:
       SPRING_DATA_MONGODB_URI: ${{ secrets.MONGO_URI }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+      SPRING_DATA_JPA_REPOSITORIES_ENABLED: false
+      SPRING_JPA_PROPERTIES_HIBERNATE_TEMP_USE_JDBC_METADATA_DEFAULTS: false
     steps:
       - name: Checkout código
         uses: actions/checkout@v3
