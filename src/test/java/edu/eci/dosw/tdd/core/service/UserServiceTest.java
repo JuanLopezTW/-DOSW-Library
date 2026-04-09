@@ -11,6 +11,7 @@ import edu.eci.dosw.tdd.persistence.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +25,7 @@ class UserServiceTest {
     private UserRepository userRepository;
     private UserPersistenceMapper userMapper;
     private LoanRepository loanRepository;
+    private PasswordEncoder passwordEncoder;
     private User user1;
     private User user2;
     private UserEntity userEntity1;
@@ -34,7 +36,8 @@ class UserServiceTest {
         userRepository = Mockito.mock(UserRepository.class);
         userMapper = Mockito.mock(UserPersistenceMapper.class);
         loanRepository = Mockito.mock(LoanRepository.class);
-        userService = new UserService(userRepository, userMapper, loanRepository);
+        passwordEncoder = Mockito.mock(PasswordEncoder.class);
+        userService = new UserService(userRepository, userMapper, loanRepository, passwordEncoder);
 
         user1 = new User("Juan", 1L);
         user2 = new User("Maria", 2L);
@@ -44,6 +47,7 @@ class UserServiceTest {
 
     @Test
     void testAddUserSuccessfully() {
+        when(passwordEncoder.encode(any())).thenReturn("hashedPassword");
         when(userMapper.toEntity(user1)).thenReturn(userEntity1);
         userService.addUser(user1);
         verify(userRepository, times(1)).save(userEntity1);

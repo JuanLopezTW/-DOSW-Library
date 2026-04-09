@@ -7,6 +7,7 @@ import edu.eci.dosw.tdd.core.service.UserService;
 import edu.eci.dosw.tdd.core.validator.UserValidator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class UserController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('LIBRARIAN')")
     public ResponseEntity<Void> addUser(@RequestBody UserDTO userDTO) {
         User user = userMapper.toModel(userDTO);
         userValidator.validate(user);
@@ -34,6 +36,7 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('LIBRARIAN')")
     public ResponseEntity<List<UserDTO>> getAllUsers() {
         List<UserDTO> users = userService.getAllUsers().stream()
                 .map(userMapper::toDTO)
@@ -42,11 +45,13 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
     public ResponseEntity<UserDTO> getUser(@PathVariable Long id) {
         return ResponseEntity.ok(userMapper.toDTO(userService.getUser(id)));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('LIBRARIAN')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();

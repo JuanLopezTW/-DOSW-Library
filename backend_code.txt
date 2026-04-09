@@ -1,0 +1,2199 @@
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\AuthController.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.controller.dto.AuthDTO;
+import edu.eci.dosw.tdd.controller.dto.RegisterDTO;
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.core.security.JwtService;
+import edu.eci.dosw.tdd.core.service.UserService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
+    private final UserService userService;
+
+    public AuthController(AuthenticationManager authenticationManager,
+                          JwtService jwtService,
+                          UserService userService) {
+        this.authenticationManager = authenticationManager;
+        this.jwtService = jwtService;
+        this.userService = userService;
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<Map<String, String>> login(@RequestBody AuthDTO authDTO) {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        authDTO.getUsername(),
+                        authDTO.getPassword()
+                )
+        );
+
+        String role = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .findFirst()
+                .orElse("ROLE_USER")
+                .replace("ROLE_", "");
+
+        String token = jwtService.generateToken(authentication.getName(), role);
+        return ResponseEntity.ok(Map.of("token", token));
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<Void> register(@RequestBody RegisterDTO registerDTO) {
+        User user = new User(
+                registerDTO.getName(),
+                0L,
+                registerDTO.getUsername(),
+                registerDTO.getPassword(),
+                "USER"
+        );
+        userService.addUser(user);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\BookController.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.controller.dto.BookDTO;
+import edu.eci.dosw.tdd.controller.mapper.BookMapper;
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.service.BookService;
+import edu.eci.dosw.tdd.core.validator.BookValidator;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/books")
+public class BookController {
+
+    private final BookService bookService;
+    private final BookValidator bookValidator;
+    private final BookMapper bookMapper;
+
+    public BookController(BookService bookService, BookValidator bookValidator, BookMapper bookMapper) {
+        this.bookService = bookService;
+        this.bookValidator = bookValidator;
+        this.bookMapper = bookMapper;
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('LIBRARIAN')")
+    public ResponseEntity<Void> addBook(@RequestBody BookDTO bookDTO) {
+        Book book = bookMapper.toModel(bookDTO);
+        bookValidator.validate(book);
+        bookService.addBook(book, bookDTO.getAvailableCopies());
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
+    public ResponseEntity<List<BookDTO>> getAllBooks() {
+        List<BookDTO> books = bookService.getAllBooks().stream()
+                .map((Book book) -> bookMapper.toDTO(book))
+                .toList();
+        return ResponseEntity.ok(books);
+    }
+    @PutMapping("/{id}/stock")
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
+    public ResponseEntity<Void> updateStock(@PathVariable Long id, @RequestParam int totalCopies) {
+        bookService.updateStock(id, totalCopies);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('LIBRARIAN')")
+    public ResponseEntity<BookDTO> getBook(@PathVariable Long id) {
+        return ResponseEntity.ok(bookMapper.toDTO(bookService.getBook(id)));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\dto\AuthDTO.java ===
+package edu.eci.dosw.tdd.controller.dto;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AuthDTO {
+    private String username;
+    private String password;
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\dto\BookDTO.java ===
+package edu.eci.dosw.tdd.controller.dto;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class BookDTO {
+    private Long id;
+    private String title;
+    private String author;
+    private Integer availableCopies;
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\dto\LoanDTO.java ===
+package edu.eci.dosw.tdd.controller.dto;
+
+import edu.eci.dosw.tdd.core.model.Loan.LoanStatus;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+import java.util.Date;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class LoanDTO {
+    private Long bookId;
+    private String bookTitle;
+    private Long userId;
+    private String userName;
+    private Date loanDate;
+    private LoanStatus status;
+    private Date returnDate;
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\dto\RegisterDTO.java ===
+package edu.eci.dosw.tdd.controller.dto;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RegisterDTO {
+    private String name;
+    private String username;
+    private String password;
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\dto\UserDTO.java ===
+package edu.eci.dosw.tdd.controller.dto;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserDTO {
+    private Long id;
+    private String name;
+    private String username;
+    private String password;
+    private String role;
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\GlobalExceptionHandler.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.exception.LoanLimitExeededException;
+import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
+import edu.eci.dosw.tdd.core.exception.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(BookNotAvailableException.class)
+    public ResponseEntity<Map<String, Object>> handleBookNotAvailable(BookNotAvailableException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(LoanNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleLoanNotFound(LoanNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserNotFound(UserNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(LoanLimitExeededException.class)
+    public ResponseEntity<Map<String, Object>> handleLoanLimitExceeded(LoanLimitExeededException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException ex) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", status.value());
+        body.put("error", status.getReasonPhrase());
+        body.put("message", message);
+        return ResponseEntity.status(status).body(body);
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\LoanController.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.controller.dto.LoanDTO;
+import edu.eci.dosw.tdd.controller.mapper.LoanMapper;
+import edu.eci.dosw.tdd.core.service.LoanService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/loans")
+public class LoanController {
+
+    private final LoanService loanService;
+    private final LoanMapper loanMapper;
+
+    public LoanController(LoanService loanService, LoanMapper loanMapper) {
+        this.loanService = loanService;
+        this.loanMapper = loanMapper;
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
+    public ResponseEntity<LoanDTO> createLoan(@RequestParam Long userId, @RequestParam Long bookId) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(loanMapper.toDTO(loanService.createLoan(userId, bookId)));
+    }
+
+    @PutMapping("/return")
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
+    public ResponseEntity<Void> returnLoan(@RequestParam Long userId, @RequestParam Long bookId) {
+        loanService.returnLoan(userId, bookId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('LIBRARIAN')")
+    public ResponseEntity<List<LoanDTO>> getAllLoans() {
+        List<LoanDTO> loans = loanService.getAllLoans().stream()
+                .map(loanMapper::toDTO)
+                .toList();
+        return ResponseEntity.ok(loans);
+    }
+
+    @GetMapping("/user/{userId}")
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
+    public ResponseEntity<List<LoanDTO>> getLoansByUser(@PathVariable Long userId) {
+        List<LoanDTO> loans = loanService.getLoansByUser(userId).stream()
+                .map(loanMapper::toDTO)
+                .toList();
+        return ResponseEntity.ok(loans);
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\mapper\BookMapper.java ===
+package edu.eci.dosw.tdd.controller.mapper;
+
+import edu.eci.dosw.tdd.controller.dto.BookDTO;
+import edu.eci.dosw.tdd.core.model.Book;
+import org.springframework.stereotype.Component;
+
+@Component
+public class BookMapper {
+
+    public BookDTO toDTO(Book book) {
+        return new BookDTO(book.getId(), book.getTitle(), book.getAuthor(),book.getAvailableCopies());
+    }
+
+    public Book toModel(BookDTO dto) {
+        return new Book(dto.getTitle(), dto.getAuthor(), dto.getId(),dto.getAvailableCopies());
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\mapper\LoanMapper.java ===
+package edu.eci.dosw.tdd.controller.mapper;
+
+import edu.eci.dosw.tdd.controller.dto.LoanDTO;
+import edu.eci.dosw.tdd.core.model.Loan;
+import org.springframework.stereotype.Component;
+
+@Component
+public class LoanMapper {
+    public LoanDTO toDTO(Loan loan) {
+        return new LoanDTO(
+                loan.getBook().getId(),
+                loan.getBook().getTitle(),
+                loan.getUser().getId(),
+                loan.getUser().getName(),
+                loan.getLoanDate(),
+                loan.getStatus(),
+                loan.getReturnDate()
+        );
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\mapper\UserMapper.java ===
+package edu.eci.dosw.tdd.controller.mapper;
+
+import edu.eci.dosw.tdd.controller.dto.UserDTO;
+import edu.eci.dosw.tdd.core.model.User;
+import org.springframework.stereotype.Component;
+
+@Component
+public class UserMapper {
+
+    public UserDTO toDTO(User user) {
+        return new UserDTO(user.getId(),user.getName(),user.getUsername(),null,user.getRole());
+    }
+
+    public User toModel(UserDTO dto) {
+        return new User(dto.getName(), dto.getId() != null ? dto.getId() : 0L,
+                dto.getUsername(), dto.getPassword(), dto.getRole());
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\SecurityConfig.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.core.security.JwtFilter;
+import edu.eci.dosw.tdd.core.security.UserDetailsServiceImpl;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    private final JwtFilter jwtFilter;
+    private final UserDetailsServiceImpl userDetailsService;
+
+    public SecurityConfig(JwtFilter jwtFilter, UserDetailsServiceImpl userDetailsService) {
+        this.jwtFilter = jwtFilter;
+        this.userDetailsService = userDetailsService;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
+            throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("*"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\SwaggerConfig.java ===
+package edu.eci.dosw.tdd.controller;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.Components;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class SwaggerConfig {
+
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("DOSW-Library API")
+                        .description("Library DOSW management REST API")
+                        .version("1.0.0"))
+                .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))
+                .components(new Components()
+                        .addSecuritySchemes("Bearer Authentication",
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\controller\UserController.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.controller.dto.UserDTO;
+import edu.eci.dosw.tdd.controller.mapper.UserMapper;
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.core.service.UserService;
+import edu.eci.dosw.tdd.core.validator.UserValidator;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+
+    private final UserService userService;
+    private final UserValidator userValidator;
+    private final UserMapper userMapper;
+
+    public UserController(UserService userService, UserValidator userValidator, UserMapper userMapper) {
+        this.userService = userService;
+        this.userValidator = userValidator;
+        this.userMapper = userMapper;
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('LIBRARIAN')")
+    public ResponseEntity<Void> addUser(@RequestBody UserDTO userDTO) {
+        User user = userMapper.toModel(userDTO);
+        userValidator.validate(user);
+        userService.addUser(user);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('LIBRARIAN')")
+    public ResponseEntity<List<UserDTO>> getAllUsers() {
+        List<UserDTO> users = userService.getAllUsers().stream()
+                .map(userMapper::toDTO)
+                .toList();
+        return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('USER', 'LIBRARIAN')")
+    public ResponseEntity<UserDTO> getUser(@PathVariable Long id) {
+        return ResponseEntity.ok(userMapper.toDTO(userService.getUser(id)));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('LIBRARIAN')")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ResponseEntity.noContent().build();
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\exception\BookNotAvailableException.java ===
+package edu.eci.dosw.tdd.core.exception;
+
+public class BookNotAvailableException extends RuntimeException{
+    public BookNotAvailableException(Long bookId) {
+        super("El libro con el id" + bookId + " no esta disponible ");
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\exception\LoanLimitExeededException.java ===
+package edu.eci.dosw.tdd.core.exception;
+
+public class LoanLimitExeededException extends RuntimeException{
+    public LoanLimitExeededException(Long Id) {
+        super("El usuario de id " + Id + "ha exedido el limite de su prestamo");
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\exception\LoanNotFoundException.java ===
+package edu.eci.dosw.tdd.core.exception;
+
+public class LoanNotFoundException extends RuntimeException{
+    public LoanNotFoundException(){
+        super("Préstamo no encontrado");
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\exception\UserNotFoundException.java ===
+package edu.eci.dosw.tdd.core.exception;
+
+public class UserNotFoundException extends RuntimeException {
+    public UserNotFoundException(Long id) {
+        super("El usuario con la id " + id + " no se ha encontrado.");
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\model\Book.java ===
+package edu.eci.dosw.tdd.core.model;
+
+import lombok.*;
+
+
+@Data
+@NoArgsConstructor
+public class Book {
+    private Long id;
+    private String title;
+    private String author;
+    private Integer availableCopies;
+
+    public Book(String title, String author, Long id) {
+        this.title = title;
+        this.author = author;
+        this.id = id;
+    }
+
+    public Book(String title, String author, Long id, Integer availableCopies) {
+        this.title = title;
+        this.author = author;
+        this.id = id;
+        this.availableCopies = availableCopies;
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\model\Loan.java ===
+package edu.eci.dosw.tdd.core.model;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.Date;
+
+@Data
+@NoArgsConstructor
+public class Loan {
+
+    public enum LoanStatus {
+        ACTIVE, RETURNED
+    }
+
+    private Book book;
+    private User user;
+    private Date loanDate;
+    private LoanStatus status;
+    private Date returnDate;
+
+    public Loan(Book book, User user, Date loanDate, LoanStatus status, Date returnDate) {
+        this.book = book;
+        this.user = user;
+        this.loanDate = loanDate;
+        this.status = status;
+        this.returnDate = returnDate;
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\model\User.java ===
+package edu.eci.dosw.tdd.core.model;
+
+import lombok.*;
+@Data
+@NoArgsConstructor
+public class User {
+    private String name;
+    private long id;
+    private String username;
+    private String password;
+    private String role;
+
+    public User(String name, long id){
+        this.name = name;
+        this.id = id;
+    }
+
+    public User(String name, long id, String username, String password, String role) {
+        this.name = name;
+        this.id = id;
+        this.username = username;
+        this.password = password;
+        this.role = role;
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\security\JwtFilter.java ===
+package edu.eci.dosw.tdd.core.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+@Component
+public class JwtFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UserDetailsServiceImpl userDetailsService;
+
+    public JwtFilter(JwtService jwtService, UserDetailsServiceImpl userDetailsService) {
+        this.jwtService = jwtService;
+        this.userDetailsService = userDetailsService;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+
+        String authHeader = request.getHeader("Authorization");
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String token = authHeader.substring(7);
+        String username = jwtService.extractUsername(token);
+
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+            if (jwtService.isTokenValid(token, username)) {
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        }
+        filterChain.doFilter(request, response);
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\security\JwtService.java ===
+package edu.eci.dosw.tdd.core.security;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.security.Key;
+import java.util.Date;
+
+@Service
+public class JwtService {
+
+    @Value("${jwt.secret}")
+    private String secretKey;
+
+    @Value("${jwt.expiration}")
+    private long expirationTime;
+
+    public String generateToken(String username, String role) {
+        return Jwts.builder()
+                .setSubject(username)
+                .claim("role", role)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String extractUsername(String token) {
+        return extractClaims(token).getSubject();
+    }
+
+    public String extractRole(String token) {
+        return extractClaims(token).get("role", String.class);
+    }
+
+    public boolean isTokenValid(String token, String username) {
+        String extractedUsername = extractUsername(token);
+        String extractedRole = extractRole(token);
+        return extractedUsername.equals(username)
+                && extractedRole != null
+                && !isTokenExpired(token);
+    }
+
+    private boolean isTokenExpired(String token) {
+        return extractClaims(token).getExpiration().before(new Date());
+    }
+
+    private Claims extractClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    private Key getSigningKey() {
+        byte[] keyBytes = hexStringToByteArray(secretKey);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    private byte[] hexStringToByteArray(String hex) {
+        int len = hex.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                    + Character.digit(hex.charAt(i + 1), 16));
+        }
+        return data;
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\security\UserDetailsServiceImpl.java ===
+package edu.eci.dosw.tdd.core.security;
+
+import edu.eci.dosw.tdd.persistence.entity.UserEntity;
+import edu.eci.dosw.tdd.persistence.repository.UserRepository;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class UserDetailsServiceImpl implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    public UserDetailsServiceImpl(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        UserEntity user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));
+
+        return new org.springframework.security.core.userdetails.User(
+                user.getUsername(),
+                user.getPassword(),
+                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+        );
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\service\BookService.java ===
+package edu.eci.dosw.tdd.core.service;
+
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.util.IdGeneratorUtil;
+import edu.eci.dosw.tdd.core.util.ValidationUtil;
+import edu.eci.dosw.tdd.persistence.entity.BookEntity;
+import edu.eci.dosw.tdd.persistence.mapper.BookPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.BookRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class BookService {
+
+    private final BookRepository bookRepository;
+    private final BookPersistenceMapper bookMapper;
+
+    public BookService(BookRepository bookRepository, BookPersistenceMapper bookMapper) {
+        this.bookRepository = bookRepository;
+        this.bookMapper = bookMapper;
+    }
+
+    public void addBook(Book book, int copies) {
+        if (!ValidationUtil.isPositive(copies)) throw new IllegalArgumentException("Copies must be positive");
+        if (book.getId() == null) book.setId(IdGeneratorUtil.generateNumericId());
+        BookEntity entity = bookMapper.toEntity(book, copies);
+        bookRepository.save(entity);
+    }
+
+    public void updateStock(Long id, int newTotalCopies) {
+        if (!ValidationUtil.isPositive(newTotalCopies))
+            throw new IllegalArgumentException("El stock total debe ser mayor a 0");
+        BookEntity entity = bookRepository.findById(id)
+                .orElseThrow(() -> new BookNotAvailableException(id));
+        int diff = newTotalCopies - entity.getTotalCopies();
+        entity.setTotalCopies(newTotalCopies);
+        entity.setAvailableCopies(Math.max(0, entity.getAvailableCopies() + diff));
+        bookRepository.save(entity);
+    }
+
+    public Book getBook(Long id) {
+        return bookRepository.findById(id)
+                .map(bookMapper::toModel)
+                .orElseThrow(() -> new BookNotAvailableException(id));
+    }
+
+    public void decreaseCopy(Long id) {
+        BookEntity entity = bookRepository.findById(id)
+                .orElseThrow(() -> new BookNotAvailableException(id));
+        if (entity.getAvailableCopies() <= 0) throw new BookNotAvailableException(id);
+        entity.setAvailableCopies(entity.getAvailableCopies() - 1);
+        bookRepository.save(entity);
+    }
+
+    public void increaseCopy(Long id) {
+        BookEntity entity = bookRepository.findById(id)
+                .orElseThrow(() -> new BookNotAvailableException(id));
+        if (entity.getAvailableCopies() >= entity.getTotalCopies()) {
+            throw new IllegalArgumentException("No se pueden devolver más copias que el total del libro");
+        }
+        entity.setAvailableCopies(entity.getAvailableCopies() + 1);
+        bookRepository.save(entity);
+    }
+
+    public List<Book> getAllBooks() {
+        return bookRepository.findAll().stream()
+                .map(bookMapper::toModel)
+                .toList();
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\service\LoanService.java ===
+package edu.eci.dosw.tdd.core.service;
+
+import edu.eci.dosw.tdd.core.exception.LoanLimitExeededException;
+import edu.eci.dosw.tdd.core.exception.LoanNotFoundException;
+import edu.eci.dosw.tdd.core.model.Loan;
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.core.util.DateUtil;
+import edu.eci.dosw.tdd.persistence.entity.BookEntity;
+import edu.eci.dosw.tdd.persistence.entity.LoanEntity;
+import edu.eci.dosw.tdd.persistence.entity.UserEntity;
+import edu.eci.dosw.tdd.persistence.mapper.LoanPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.BookRepository;
+import edu.eci.dosw.tdd.persistence.repository.LoanRepository;
+import edu.eci.dosw.tdd.persistence.repository.UserRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class LoanService {
+
+    private static final int MAX_LOANS = 3;
+
+    private final LoanRepository loanRepository;
+    private final BookRepository bookRepository;
+    private final UserRepository userRepository;
+    private final LoanPersistenceMapper loanMapper;
+    private final BookService bookService;
+    private final UserService userService;
+
+    public LoanService(LoanRepository loanRepository, BookRepository bookRepository,UserRepository userRepository, LoanPersistenceMapper loanMapper,
+                       BookService bookService, UserService userService) {
+        this.loanRepository = loanRepository;
+        this.bookRepository = bookRepository;
+        this.userRepository = userRepository;
+        this.loanMapper = loanMapper;
+        this.bookService = bookService;
+        this.userService = userService;
+    }
+
+    public Loan createLoan(Long userId, Long bookId) {
+        User user = userService.getUser(userId);
+        Book book = bookService.getBook(bookId);
+
+        long activeLoans = loanRepository.findByUserIdAndStatus(userId, Loan.LoanStatus.ACTIVE.name()).size();
+        if (activeLoans >= MAX_LOANS) throw new LoanLimitExeededException(userId);
+
+        bookService.decreaseCopy(bookId);
+
+        UserEntity userEntity = userRepository.findById(userId).orElseThrow();
+        BookEntity bookEntity = bookRepository.findById(bookId).orElseThrow();
+
+        LoanEntity entity = new LoanEntity();
+        entity.setUser(userEntity);
+        entity.setBook(bookEntity);
+        entity.setLoanDate(DateUtil.today());
+        entity.setStatus(Loan.LoanStatus.ACTIVE.name());
+        loanRepository.save(entity);
+
+        return loanMapper.toModel(entity);
+    }
+
+    public void returnLoan(Long userId, Long bookId) {
+        LoanEntity entity = loanRepository
+                .findByUserIdAndBookIdAndStatus(userId, bookId, Loan.LoanStatus.ACTIVE.name())
+                .orElseThrow(() -> new LoanNotFoundException());
+
+        entity.setStatus(Loan.LoanStatus.RETURNED.name());
+        entity.setReturnDate(DateUtil.today());
+        loanRepository.save(entity);
+        bookService.increaseCopy(bookId);
+    }
+
+    public List<Loan> getAllLoans() {
+        return loanRepository.findAll().stream()
+                .map(loanMapper::toModel)
+                .toList();
+    }
+
+    public List<Loan> getLoansByUser(Long userId) {
+        return loanRepository.findByUserId(userId).stream()
+                .map(loanMapper::toModel)
+                .toList();
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\service\UserService.java ===
+package edu.eci.dosw.tdd.core.service;
+
+import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
+import edu.eci.dosw.tdd.core.model.Loan;
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.persistence.mapper.UserPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.LoanRepository;
+import edu.eci.dosw.tdd.persistence.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final UserPersistenceMapper userMapper;
+    private final LoanRepository loanRepository;
+    private final PasswordEncoder passwordEncoder; // agrega esto
+
+    public UserService(UserRepository userRepository, UserPersistenceMapper userMapper,
+                       LoanRepository loanRepository, PasswordEncoder passwordEncoder) { // agrega esto
+        this.userRepository = userRepository;
+        this.userMapper = userMapper;
+        this.loanRepository = loanRepository;
+        this.passwordEncoder = passwordEncoder; // agrega esto
+    }
+
+    public void addUser(User user) {
+        user.setPassword(passwordEncoder.encode(user.getPassword())); // agrega esto
+        userRepository.save(userMapper.toEntity(user));
+    }
+
+    public User getUser(Long id) {
+        return userRepository.findById(id)
+                .map(userMapper::toModel)
+                .orElseThrow(() -> new UserNotFoundException(id));
+    }
+
+    public List<User> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(userMapper::toModel)
+                .toList();
+    }
+
+    public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) throw new UserNotFoundException(id);
+        long activeLoans = loanRepository.findByUserIdAndStatus(id, Loan.LoanStatus.ACTIVE.name()).size();
+        if (activeLoans > 0) throw new IllegalArgumentException("No se puede eliminar un usuario con prestamos activos");
+        userRepository.deleteById(id);
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\util\DateUtil.java ===
+package edu.eci.dosw.tdd.core.util;
+
+
+import java.time.*;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+
+public class DateUtil {
+
+    private DateUtil() {}
+
+    public static long daysBetween(Date start, Date end) {
+        LocalDate startDate = start.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate endDate = end.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        return ChronoUnit.DAYS.between(startDate, endDate);
+    }
+
+    public static boolean isOverdue(Date returnDate) {
+        return returnDate != null && returnDate.before(new Date());
+    }
+
+    public static Date today() {
+        return new Date();
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\util\IdGeneratorUtil.java ===
+package edu.eci.dosw.tdd.core.util;
+
+import java.util.UUID;
+
+public class IdGeneratorUtil {
+
+    private IdGeneratorUtil() {}
+
+    public static String generateUUID() {
+        return UUID.randomUUID().toString();
+    }
+
+    public static Long generateNumericId() {
+        return Math.abs(UUID.randomUUID().getMostSignificantBits());
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\util\ValidationUtil.java ===
+package edu.eci.dosw.tdd.core.util;
+
+public class ValidationUtil {
+
+    private ValidationUtil() {}
+
+    public static boolean isNotEmpty(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    public static boolean isPositive(Number value) {
+        return value != null && value.doubleValue() > 0;
+    }
+
+    public static boolean isValidId(Long id) {
+        return id != null && id > 0;
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\validator\BookValidator.java ===
+package edu.eci.dosw.tdd.core.validator;
+
+import edu.eci.dosw.tdd.core.model.Book;
+import org.springframework.stereotype.Component;
+
+@Component
+public class BookValidator {
+
+    public void validate(Book book) {
+        if (book == null) throw new IllegalArgumentException("Un libro no puede ser null");
+        if (book.getTitle() == null || book.getTitle().isBlank()) throw new IllegalArgumentException("El titulo de un libro no puede estar vacio");
+        if (book.getAuthor() == null || book.getAuthor().isBlank()) throw new IllegalArgumentException("El libro debe tener un autor");
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\validator\LoanValidator.java ===
+package edu.eci.dosw.tdd.core.validator;
+
+import edu.eci.dosw.tdd.core.model.Loan;
+import org.springframework.stereotype.Component;
+
+@Component
+public class LoanValidator {
+
+    public void validate(Loan loan) {
+        if (loan == null) throw new IllegalArgumentException("Un prestamo no puede ser null");
+        if (loan.getBook() == null) throw new IllegalArgumentException("Un prestamo no puede ser de un libro null");
+        if (loan.getUser() == null) throw new IllegalArgumentException("El usuario del prestamo no puede ser null");
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\core\validator\UserValidator.java ===
+package edu.eci.dosw.tdd.core.validator;
+
+import edu.eci.dosw.tdd.core.model.User;
+import org.springframework.stereotype.Component;
+
+@Component
+public class UserValidator {
+
+    public void validate(User user) {
+        if (user == null) throw new IllegalArgumentException("Un usuario no puede ser null");
+        if (user.getName() == null || user.getName().isBlank()) throw new IllegalArgumentException("Un usuario no puede tener un nombre vacio");
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\DoswLibraryApplication.java ===
+package edu.eci.dosw.tdd;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DoswLibraryApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(DoswLibraryApplication.class, args);
+    }
+
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\entity\BookEntity.java ===
+package edu.eci.dosw.tdd.persistence.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "books")
+public class BookEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String title;
+
+    @Column(nullable = false)
+    private String author;
+
+    @Column(nullable = false)
+    private Integer totalCopies;
+
+    @Column(nullable = false)
+    private Integer availableCopies;
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\entity\LoanEntity.java ===
+package edu.eci.dosw.tdd.persistence.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+import java.util.Date;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "loans")
+public class LoanEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private UserEntity user;
+
+    @ManyToOne
+    @JoinColumn(name = "book_id", nullable = false)
+    private BookEntity book;
+
+    @Column(nullable = false)
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date loanDate;
+
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date returnDate;
+
+    @Column(nullable = false)
+    private String status;
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\entity\UserEntity.java ===
+package edu.eci.dosw.tdd.persistence.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "users")
+public class UserEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false, unique = true)
+    private String username;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
+    public enum Role {
+        USER, LIBRARIAN
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\mapper\BookPersistenceMapper.java ===
+package edu.eci.dosw.tdd.persistence.mapper;
+
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.persistence.entity.BookEntity;
+import org.springframework.stereotype.Component;
+
+@Component
+public class BookPersistenceMapper {
+
+    public BookEntity toEntity(Book book, int availableCopies) {
+        BookEntity entity = new BookEntity();
+        entity.setTitle(book.getTitle());
+        entity.setAuthor(book.getAuthor());
+        entity.setTotalCopies(availableCopies);
+        entity.setAvailableCopies(availableCopies);
+        return entity;
+    }
+
+    public Book toModel(BookEntity entity) {
+        return new Book(entity.getTitle(), entity.getAuthor(), entity.getId(), entity.getAvailableCopies());
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\mapper\LoanPersistenceMapper.java ===
+package edu.eci.dosw.tdd.persistence.mapper;
+
+import edu.eci.dosw.tdd.core.model.*;
+import edu.eci.dosw.tdd.persistence.entity.BookEntity;
+import edu.eci.dosw.tdd.persistence.entity.LoanEntity;
+import edu.eci.dosw.tdd.persistence.entity.UserEntity;
+import org.springframework.stereotype.Component;
+
+@Component
+public class LoanPersistenceMapper {
+
+    public LoanEntity toEntity(Loan loan, UserEntity userEntity, BookEntity bookEntity) {
+        LoanEntity entity = new LoanEntity();
+        entity.setUser(userEntity);
+        entity.setBook(bookEntity);
+        entity.setLoanDate(loan.getLoanDate());
+        entity.setReturnDate(loan.getReturnDate());
+        entity.setStatus(loan.getStatus().name());
+        return entity;
+    }
+
+    public Loan toModel(LoanEntity entity) {
+        Book book = new Book(entity.getBook().getTitle(), entity.getBook().getAuthor(), entity.getBook().getId());
+        User user = new User(entity.getUser().getName(), entity.getUser().getId());
+        return new Loan(book, user, entity.getLoanDate(), Loan.LoanStatus.valueOf(entity.getStatus()), entity.getReturnDate());
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\mapper\UserPersistenceMapper.java ===
+package edu.eci.dosw.tdd.persistence.mapper;
+
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.persistence.entity.UserEntity;
+import org.springframework.stereotype.Component;
+
+@Component
+public class UserPersistenceMapper {
+
+    public UserEntity toEntity(User user) {
+        UserEntity entity = new UserEntity();
+        entity.setRole(UserEntity.Role.USER);
+        entity.setPassword(user.getPassword());
+        entity.setUsername(user.getUsername());
+        entity.setName(user.getName());
+        return entity;
+    }
+
+    public User toModel(UserEntity entity) {
+        return new User(entity.getName(), entity.getId(),
+                entity.getUsername(), null,
+                entity.getRole().name());
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\repository\BookRepository.java ===
+package edu.eci.dosw.tdd.persistence.repository;
+
+import edu.eci.dosw.tdd.persistence.entity.BookEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface BookRepository extends JpaRepository<BookEntity, Long> {
+    List<BookEntity> findByAvailableCopiesGreaterThan(int copies);
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\repository\LoanRepository.java ===
+package edu.eci.dosw.tdd.persistence.repository;
+
+import edu.eci.dosw.tdd.persistence.entity.LoanEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface LoanRepository extends JpaRepository<LoanEntity, Long> {
+    List<LoanEntity> findByUserId(Long userId);
+    List<LoanEntity> findByUserIdAndStatus(Long userId, String status);
+    Optional<LoanEntity> findByUserIdAndBookIdAndStatus(Long userId, Long bookId, String status);
+}
+=== C:\Users\JM_14\-DOSW-Library\src\main\java\edu\eci\dosw\tdd\persistence\repository\UserRepository.java ===
+package edu.eci.dosw.tdd.persistence.repository;
+
+import edu.eci.dosw.tdd.persistence.entity.UserEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<UserEntity, Long> {
+    Optional<UserEntity> findByUsername(String username);
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\controller\BookControllerTest.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.controller.dto.BookDTO;
+import edu.eci.dosw.tdd.controller.mapper.BookMapper;
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.service.BookService;
+import edu.eci.dosw.tdd.core.validator.BookValidator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class BookControllerTest {
+
+    private BookController bookController;
+    private BookService bookService;
+    private BookValidator bookValidator;
+    private BookMapper bookMapper;
+
+    @BeforeEach
+    void setUp() {
+        bookService = Mockito.mock(BookService.class);
+        bookValidator = Mockito.mock(BookValidator.class);
+        bookMapper = Mockito.mock(BookMapper.class);
+        bookController = new BookController(bookService, bookValidator, bookMapper);
+    }
+
+    @Test
+    void testGetAllBooksSuccessfully() {
+        when(bookService.getAllBooks()).thenReturn(List.of());
+        ResponseEntity<List<BookDTO>> response = bookController.getAllBooks();
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void testAddBookSuccessfully() {
+        BookDTO bookDTO = new BookDTO(1L, "El Principito", "Antoine", 3);
+        Book book = new Book("El Principito", "Antoine", 1L, 3);
+        when(bookMapper.toModel(bookDTO)).thenReturn(book);
+        ResponseEntity<Void> response = bookController.addBook(bookDTO);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+    }
+
+    @Test
+    void testGetBookSuccessfully() {
+        Book book = new Book("El Principito", "Antoine", 1L, 3);
+        BookDTO bookDTO = new BookDTO(1L, "El Principito", "Antoine", 3);
+        when(bookService.getBook(1L)).thenReturn(book);
+        when(bookMapper.toDTO(book)).thenReturn(bookDTO);
+        ResponseEntity<BookDTO> response = bookController.getBook(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void testGetBookNotFound() {
+        when(bookService.getBook(99L)).thenThrow(new BookNotAvailableException(99L));
+        assertThrows(BookNotAvailableException.class, () -> bookController.getBook(99L));
+    }
+
+    @Test
+    void testAddBookValidationFails() {
+        BookDTO bookDTO = new BookDTO(1L, "", "Antoine", 3);
+        Book book = new Book("", "Antoine", 1L, 3);
+        when(bookMapper.toModel(bookDTO)).thenReturn(book);
+        doThrow(new IllegalArgumentException("Book title cannot be empty"))
+                .when(bookValidator).validate(book);
+        assertThrows(IllegalArgumentException.class, () -> bookController.addBook(bookDTO));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\controller\LoanControllerTest.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.controller.dto.LoanDTO;
+import edu.eci.dosw.tdd.controller.mapper.LoanMapper;
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.exception.LoanLimitExeededException;
+import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.model.Loan;
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.core.service.LoanService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import java.util.Date;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class LoanControllerTest {
+
+    private LoanController loanController;
+    private LoanService loanService;
+    private LoanMapper loanMapper;
+
+    @BeforeEach
+    void setUp() {
+        loanService = Mockito.mock(LoanService.class);
+        loanMapper = Mockito.mock(LoanMapper.class);
+        loanController = new LoanController(loanService, loanMapper);
+    }
+
+    @Test
+    void testCreateLoanSuccessfully() {
+        Book book = new Book("El Principito", "Antoine", 1L);
+        User user = new User("Juan", 1L);
+        Loan loan = new Loan(book, user, new Date(), Loan.LoanStatus.ACTIVE, null);
+        LoanDTO loanDTO = new LoanDTO(1L, "El Principito", 1L, "Juan", new Date(), Loan.LoanStatus.ACTIVE, null);
+        when(loanService.createLoan(1L, 1L)).thenReturn(loan);
+        when(loanMapper.toDTO(loan)).thenReturn(loanDTO);
+        ResponseEntity<LoanDTO> response = loanController.createLoan(1L, 1L);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+    }
+
+    @Test
+    void testReturnLoanSuccessfully() {
+        ResponseEntity<Void> response = loanController.returnLoan(1L, 1L);
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+    }
+
+    @Test
+    void testGetAllLoansSuccessfully() {
+        when(loanService.getAllLoans()).thenReturn(List.of());
+        ResponseEntity<List<LoanDTO>> response = loanController.getAllLoans();
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void testGetLoansByUserSuccessfully() {
+        when(loanService.getLoansByUser(1L)).thenReturn(List.of());
+        ResponseEntity<List<LoanDTO>> response = loanController.getLoansByUser(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void testCreateLoanUserNotFound() {
+        when(loanService.createLoan(99L, 1L)).thenThrow(new UserNotFoundException(99L));
+        assertThrows(UserNotFoundException.class, () -> loanController.createLoan(99L, 1L));
+    }
+
+    @Test
+    void testCreateLoanBookNotFound() {
+        when(loanService.createLoan(1L, 99L)).thenThrow(new BookNotAvailableException(99L));
+        assertThrows(BookNotAvailableException.class, () -> loanController.createLoan(1L, 99L));
+    }
+
+    @Test
+    void testCreateLoanLimitExceeded() {
+        when(loanService.createLoan(1L, 1L)).thenThrow(new LoanLimitExeededException(1L));
+        assertThrows(LoanLimitExeededException.class, () -> loanController.createLoan(1L, 1L));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\controller\UserControllerTest.java ===
+package edu.eci.dosw.tdd.controller;
+
+import edu.eci.dosw.tdd.controller.dto.UserDTO;
+import edu.eci.dosw.tdd.controller.mapper.UserMapper;
+import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.core.service.UserService;
+import edu.eci.dosw.tdd.core.validator.UserValidator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class UserControllerTest {
+
+    private UserController userController;
+    private UserService userService;
+    private UserValidator userValidator;
+    private UserMapper userMapper;
+
+    @BeforeEach
+    void setUp() {
+        userService = Mockito.mock(UserService.class);
+        userValidator = Mockito.mock(UserValidator.class);
+        userMapper = Mockito.mock(UserMapper.class);
+        userController = new UserController(userService, userValidator, userMapper);
+    }
+
+    @Test
+    void testGetAllUsersSuccessfully() {
+        when(userService.getAllUsers()).thenReturn(List.of());
+        ResponseEntity<List<UserDTO>> response = userController.getAllUsers();
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    @Test
+    void testAddUserSuccessfully() {
+        UserDTO userDTO = new UserDTO(1L, "Juan", "juanlopez", "1234", "USER");
+        User user = new User("Juan", 1L);
+        when(userMapper.toModel(userDTO)).thenReturn(user);
+        ResponseEntity<Void> response = userController.addUser(userDTO);
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+    }
+
+    @Test
+    void testGetUserSuccessfully() {
+        User user = new User("Juan", 1L);
+        UserDTO userDTO = new UserDTO(1L, "Juan", "juanlopez", "1234", "USER");
+        when(userService.getUser(1L)).thenReturn(user);
+        when(userMapper.toDTO(user)).thenReturn(userDTO);
+        ResponseEntity<UserDTO> response = userController.getUser(1L);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+
+    @Test
+    void testDeleteUserSuccessfully() {
+        ResponseEntity<Void> response = userController.deleteUser(1L);
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+    }
+
+    @Test
+    void testGetUserNotFound() {
+        when(userService.getUser(99L)).thenThrow(new UserNotFoundException(99L));
+        assertThrows(UserNotFoundException.class, () -> userController.getUser(99L));
+    }
+
+    @Test
+    void testAddUserValidationFails() {
+        UserDTO userDTO = new UserDTO(1L, "", null, null, null);
+        User user = new User("", 1L);
+        when(userMapper.toModel(userDTO)).thenReturn(user);
+        doThrow(new IllegalArgumentException("User name cannot be empty"))
+                .when(userValidator).validate(user);
+        assertThrows(IllegalArgumentException.class, () -> userController.addUser(userDTO));
+    }
+}
+
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\core\service\BookServiceTest.java ===
+package edu.eci.dosw.tdd.core.service;
+
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.persistence.entity.BookEntity;
+import edu.eci.dosw.tdd.persistence.mapper.BookPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.BookRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class BookServiceTest {
+
+    private BookService bookService;
+    private BookRepository bookRepository;
+    private BookPersistenceMapper bookMapper;
+    private Book book1;
+    private BookEntity bookEntity1;
+
+    @BeforeEach
+    void setUp() {
+        bookRepository = Mockito.mock(BookRepository.class);
+        bookMapper = Mockito.mock(BookPersistenceMapper.class);
+        bookService = new BookService(bookRepository, bookMapper);
+
+        book1 = new Book("El Principito", "Antoine", 1L, 3);
+        bookEntity1 = new BookEntity(1L, "El Principito", "Antoine", 3, 2);
+    }
+
+    @Test
+    void testAddBookSuccessfully() {
+        when(bookMapper.toEntity(book1, 3)).thenReturn(bookEntity1);
+        bookService.addBook(book1, 3);
+        verify(bookRepository, times(1)).save(bookEntity1);
+    }
+
+    @Test
+    void testGetBookSuccessfully() {
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        when(bookMapper.toModel(bookEntity1)).thenReturn(book1);
+        Book found = bookService.getBook(1L);
+        assertEquals(book1, found);
+    }
+
+    @Test
+    void testGetAllBooks() {
+        when(bookRepository.findAll()).thenReturn(List.of(bookEntity1));
+        when(bookMapper.toModel(bookEntity1)).thenReturn(book1);
+        assertEquals(1, bookService.getAllBooks().size());
+    }
+
+    @Test
+    void testDecreaseCopySuccessfully() {
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        bookService.decreaseCopy(1L);
+        assertEquals(1, bookEntity1.getAvailableCopies());
+    }
+
+
+    @Test
+    void testIncreaseCopySuccessfully() {
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        bookService.increaseCopy(1L);
+        assertEquals(3, bookEntity1.getAvailableCopies());
+    }
+
+    @Test
+    void testGetBookNotFound() {
+        when(bookRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(BookNotAvailableException.class, () -> bookService.getBook(99L));
+    }
+
+    @Test
+    void testUpdateStockSuccessfully() {
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        bookService.updateStock(1L, 5);
+        assertEquals(5, bookEntity1.getTotalCopies());
+    }
+
+    @Test
+    void testUpdateStockInvalid() {
+        assertThrows(IllegalArgumentException.class, () -> bookService.updateStock(1L, 0));
+    }
+
+    @Test
+    void testDecreaseCopyBookNotFound() {
+        when(bookRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(BookNotAvailableException.class, () -> bookService.decreaseCopy(99L));
+    }
+
+    @Test
+    void testDecreaseCopyNoAvailableCopies() {
+        bookEntity1.setAvailableCopies(0);
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        assertThrows(BookNotAvailableException.class, () -> bookService.decreaseCopy(1L));
+    }
+
+    @Test
+    void testAddBookInvalidCopies() {
+        assertThrows(IllegalArgumentException.class, () -> bookService.addBook(book1, 0));
+    }
+
+    @Test
+    void testIncreaseCopyExceedsTotalCopies() {
+        bookEntity1 = new BookEntity(1L, "El Principito", "Antoine", 3, 3);
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        assertThrows(IllegalArgumentException.class, () -> bookService.increaseCopy(1L));
+    }
+
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\core\service\LoanServiceTest.java ===
+package edu.eci.dosw.tdd.core.service;
+
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.exception.LoanLimitExeededException;
+import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.model.Loan;
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.persistence.entity.BookEntity;
+import edu.eci.dosw.tdd.persistence.entity.LoanEntity;
+import edu.eci.dosw.tdd.persistence.entity.UserEntity;
+import edu.eci.dosw.tdd.persistence.mapper.LoanPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.BookRepository;
+import edu.eci.dosw.tdd.persistence.repository.LoanRepository;
+import edu.eci.dosw.tdd.persistence.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class LoanServiceTest {
+
+    private LoanService loanService;
+    private BookService bookService;
+    private UserService userService;
+    private LoanRepository loanRepository;
+    private BookRepository bookRepository;
+    private UserRepository userRepository;
+    private LoanPersistenceMapper loanMapper;
+
+    private Book book1;
+    private Book book2;
+    private Book book3;
+    private Book book4;
+    private User user1;
+    private BookEntity bookEntity1;
+    private BookEntity bookEntity2;
+    private BookEntity bookEntity3;
+    private BookEntity bookEntity4;
+    private UserEntity userEntity1;
+
+    @BeforeEach
+    void setUp() {
+        bookService = Mockito.mock(BookService.class);
+        userService = Mockito.mock(UserService.class);
+        loanRepository = Mockito.mock(LoanRepository.class);
+        bookRepository = Mockito.mock(BookRepository.class);
+        userRepository = Mockito.mock(UserRepository.class);
+        loanMapper = Mockito.mock(LoanPersistenceMapper.class);
+
+        loanService = new LoanService(loanRepository, bookRepository, userRepository,
+                loanMapper, bookService, userService);
+
+        book1 = new Book("El Principito", "Antoine", 1L, 3);
+        book2 = new Book("Cien Anos de Soledad", "Garcia Marquez", 2L, 3);
+        book3 = new Book("1984", "Orwell", 3L, 3);
+        book4 = new Book("Don Quijote", "Cervantes", 4L, 3);
+        user1 = new User("Juan", 1L);
+
+        bookEntity1 = new BookEntity(1L, "El Principito", "Antoine", 3, 3);
+        bookEntity2 = new BookEntity(2L, "Cien Anos de Soledad", "Garcia Marquez", 3, 3);
+        bookEntity3 = new BookEntity(3L, "1984", "Orwell", 3, 3);
+        bookEntity4 = new BookEntity(4L, "Don Quijote", "Cervantes", 3, 3);
+        userEntity1 = new UserEntity(1L, "Juan", "juan123", "1234", UserEntity.Role.USER);
+
+        when(bookService.getBook(1L)).thenReturn(book1);
+        when(bookService.getBook(2L)).thenReturn(book2);
+        when(bookService.getBook(3L)).thenReturn(book3);
+        when(bookService.getBook(4L)).thenReturn(book4);
+        when(userService.getUser(1L)).thenReturn(user1);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(userEntity1));
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(bookEntity1));
+        when(bookRepository.findById(2L)).thenReturn(Optional.of(bookEntity2));
+        when(bookRepository.findById(3L)).thenReturn(Optional.of(bookEntity3));
+        when(bookRepository.findById(4L)).thenReturn(Optional.of(bookEntity4));
+
+        when(loanRepository.findByUserIdAndStatus(anyLong(), anyString())).thenReturn(List.of());
+    }
+
+    @Test
+    void testCreateLoanSuccessfully() {
+        LoanEntity entity = new LoanEntity();
+        entity.setUser(userEntity1);
+        entity.setBook(bookEntity1);
+        entity.setStatus(Loan.LoanStatus.ACTIVE.name());
+        when(loanRepository.save(any())).thenReturn(entity);
+        when(loanMapper.toModel(any())).thenReturn(new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null));
+
+        Loan loan = loanService.createLoan(1L, 1L);
+        assertNotNull(loan);
+        assertEquals(Loan.LoanStatus.ACTIVE, loan.getStatus());
+    }
+
+    @Test
+    void testCreateLoanDecreasesCopies() {
+        when(loanMapper.toModel(any())).thenReturn(new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null));
+        loanService.createLoan(1L, 1L);
+        verify(bookService, times(1)).decreaseCopy(1L);
+    }
+
+    @Test
+    void testReturnLoanSuccessfully() {
+        LoanEntity entity = new LoanEntity();
+        entity.setUser(userEntity1);
+        entity.setBook(bookEntity1);
+        entity.setStatus(Loan.LoanStatus.ACTIVE.name());
+
+        when(loanMapper.toModel(any())).thenReturn(new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null));
+        when(loanRepository.findByUserIdAndBookIdAndStatus(1L, 1L, Loan.LoanStatus.ACTIVE.name()))
+                .thenReturn(Optional.of(entity));
+
+        loanService.createLoan(1L, 1L);
+        loanService.returnLoan(1L, 1L);
+        assertEquals(Loan.LoanStatus.RETURNED.name(), entity.getStatus());
+    }
+
+    @Test
+    void testReturnLoanIncreasesCopies() {
+        LoanEntity entity = new LoanEntity();
+        entity.setUser(userEntity1);
+        entity.setBook(bookEntity1);
+        entity.setStatus(Loan.LoanStatus.ACTIVE.name());
+
+        when(loanMapper.toModel(any())).thenReturn(new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null));
+        when(loanRepository.findByUserIdAndBookIdAndStatus(1L, 1L, Loan.LoanStatus.ACTIVE.name()))
+                .thenReturn(Optional.of(entity));
+
+        loanService.createLoan(1L, 1L);
+        loanService.returnLoan(1L, 1L);
+        verify(bookService, times(1)).increaseCopy(1L);
+    }
+
+    @Test
+    void testGetAllLoans() {
+        when(loanMapper.toModel(any())).thenReturn(new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null));
+        when(loanRepository.findAll()).thenReturn(List.of(new LoanEntity(), new LoanEntity()));
+        assertEquals(2, loanService.getAllLoans().size());
+    }
+
+    @Test
+    void testGetLoansByUser() {
+        when(loanMapper.toModel(any())).thenReturn(new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null));
+        when(loanRepository.findByUserId(1L)).thenReturn(List.of(new LoanEntity(), new LoanEntity()));
+        assertEquals(2, loanService.getLoansByUser(1L).size());
+    }
+
+    @Test
+    void testCreateLoanUserNotFound() {
+        when(userService.getUser(99L)).thenThrow(new UserNotFoundException(99L));
+        assertThrows(UserNotFoundException.class, () -> loanService.createLoan(99L, 1L));
+    }
+
+    @Test
+    void testCreateLoanBookNotFound() {
+        when(bookService.getBook(99L)).thenThrow(new BookNotAvailableException(99L));
+        assertThrows(BookNotAvailableException.class, () -> loanService.createLoan(1L, 99L));
+    }
+
+    @Test
+    void testCreateLoanLimitExceeded() {
+        LoanEntity entity = new LoanEntity();
+        when(loanMapper.toModel(any())).thenReturn(new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null));
+        when(loanRepository.findByUserIdAndStatus(anyLong(), anyString()))
+                .thenReturn(List.of(entity, entity, entity));
+        assertThrows(LoanLimitExeededException.class, () -> loanService.createLoan(1L, 1L));
+    }
+
+    @Test
+    void testCreateLoanBookNotAvailable() {
+        when(bookService.getBook(1L)).thenReturn(book1);
+        doThrow(new BookNotAvailableException(1L)).when(bookService).decreaseCopy(1L);
+        assertThrows(BookNotAvailableException.class, () -> loanService.createLoan(1L, 1L));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\core\service\UserServiceTest.java ===
+package edu.eci.dosw.tdd.core.service;
+
+import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
+import edu.eci.dosw.tdd.core.model.Loan;
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.persistence.entity.LoanEntity;
+import edu.eci.dosw.tdd.persistence.entity.UserEntity;
+import edu.eci.dosw.tdd.persistence.mapper.UserPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.LoanRepository;
+import edu.eci.dosw.tdd.persistence.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class UserServiceTest {
+
+    private UserService userService;
+    private UserRepository userRepository;
+    private UserPersistenceMapper userMapper;
+    private LoanRepository loanRepository;
+    private PasswordEncoder passwordEncoder;
+    private User user1;
+    private User user2;
+    private UserEntity userEntity1;
+    private UserEntity userEntity2;
+
+    @BeforeEach
+    void setUp() {
+        userRepository = Mockito.mock(UserRepository.class);
+        userMapper = Mockito.mock(UserPersistenceMapper.class);
+        loanRepository = Mockito.mock(LoanRepository.class);
+        passwordEncoder = Mockito.mock(PasswordEncoder.class);
+        userService = new UserService(userRepository, userMapper, loanRepository, passwordEncoder);
+
+        user1 = new User("Juan", 1L);
+        user2 = new User("Maria", 2L);
+        userEntity1 = new UserEntity(1L, "Juan", "juan123", "1234", UserEntity.Role.USER);
+        userEntity2 = new UserEntity(2L, "Maria", "maria123", "1234", UserEntity.Role.USER);
+    }
+
+    @Test
+    void testAddUserSuccessfully() {
+        when(passwordEncoder.encode(any())).thenReturn("hashedPassword");
+        when(userMapper.toEntity(user1)).thenReturn(userEntity1);
+        userService.addUser(user1);
+        verify(userRepository, times(1)).save(userEntity1);
+    }
+
+    @Test
+    void testGetUserSuccessfully() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(userEntity1));
+        when(userMapper.toModel(userEntity1)).thenReturn(user1);
+        User found = userService.getUser(1L);
+        assertEquals(user1, found);
+    }
+
+    @Test
+    void testGetAllUsers() {
+        when(userRepository.findAll()).thenReturn(List.of(userEntity1, userEntity2));
+        when(userMapper.toModel(userEntity1)).thenReturn(user1);
+        when(userMapper.toModel(userEntity2)).thenReturn(user2);
+        assertEquals(2, userService.getAllUsers().size());
+    }
+
+    @Test
+    void testDeleteUserSuccessfully() {
+        when(userRepository.existsById(1L)).thenReturn(true);
+        when(loanRepository.findByUserIdAndStatus(1L, Loan.LoanStatus.ACTIVE.name()))
+                .thenReturn(List.of());
+        userService.deleteUser(1L);
+        verify(userRepository, times(1)).deleteById(1L);
+    }
+
+    @Test
+    void testDeleteUserWithActiveLoans() {
+        when(userRepository.existsById(1L)).thenReturn(true);
+        when(loanRepository.findByUserIdAndStatus(1L, Loan.LoanStatus.ACTIVE.name()))
+                .thenReturn(List.of(new LoanEntity()));
+        assertThrows(IllegalArgumentException.class, () -> userService.deleteUser(1L));
+    }
+
+    @Test
+    void testGetUserNotFound() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(UserNotFoundException.class, () -> userService.getUser(99L));
+    }
+
+    @Test
+    void testDeleteUserNotFound() {
+        when(userRepository.existsById(99L)).thenReturn(false);
+        assertThrows(UserNotFoundException.class, () -> userService.deleteUser(99L));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\core\validator\BookValidatorTest.java ===
+package edu.eci.dosw.tdd.core.validator;
+
+
+import edu.eci.dosw.tdd.core.model.Book;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class BookValidatorTest {
+
+    private BookValidator bookValidator;
+
+    @BeforeEach
+    void setUp() {
+        bookValidator = new BookValidator();
+    }
+
+    @Test
+    void testValidateBookSuccessfully() {
+        Book book = new Book("El Principito", "Antoine", 1L);
+        assertDoesNotThrow(() -> bookValidator.validate(book));
+    }
+
+
+
+    @Test
+    void testValidateBookNull() {
+        assertThrows(IllegalArgumentException.class, () -> bookValidator.validate(null));
+    }
+
+
+    @Test
+    void testValidateBookTitleEmpty() {
+        Book book = new Book("", "Antoine", 1L);
+        assertThrows(IllegalArgumentException.class, () -> bookValidator.validate(book));
+    }
+
+    @Test
+    void testValidateBookAuthorEmpty() {
+        Book book = new Book("El Principito", "", 1L);
+        assertThrows(IllegalArgumentException.class, () -> bookValidator.validate(book));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\core\validator\LoanValidatorTest.java ===
+package edu.eci.dosw.tdd.core.validator;
+
+import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.model.Loan;
+import edu.eci.dosw.tdd.core.model.User;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class LoanValidatorTest {
+
+    private LoanValidator loanValidator;
+    private Book book1;
+    private User user1;
+
+    @BeforeEach
+    void setUp() {
+        loanValidator = new LoanValidator();
+        book1 = new Book("El Principito", "Antoine", 1L);
+        user1 = new User("Juan", 1L);
+    }
+
+    @Test
+    void testValidateLoanSuccessfully() {
+        Loan loan = new Loan(book1, user1, null, Loan.LoanStatus.ACTIVE, null);
+        assertDoesNotThrow(() -> loanValidator.validate(loan));
+    }
+
+    @Test
+    void testValidateLoanNull() {
+        assertThrows(IllegalArgumentException.class, () -> loanValidator.validate(null));
+    }
+
+    @Test
+    void testValidateLoanBookNull() {
+        Loan loan = new Loan(null, user1, null, Loan.LoanStatus.ACTIVE, null);
+        assertThrows(IllegalArgumentException.class, () -> loanValidator.validate(loan));
+    }
+
+    @Test
+    void testValidateLoanUserNull() {
+        Loan loan = new Loan(book1, null, null, Loan.LoanStatus.ACTIVE, null);
+        assertThrows(IllegalArgumentException.class, () -> loanValidator.validate(loan));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\core\validator\UserValidatorTest.java ===
+package edu.eci.dosw.tdd.core.validator;
+
+import edu.eci.dosw.tdd.core.model.User;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class UserValidatorTest {
+
+    private UserValidator userValidator;
+
+    @BeforeEach
+    void setUp() {
+        userValidator = new UserValidator();
+    }
+
+    @Test
+    void testValidateUserSuccessfully() {
+        User user = new User("Juan", 1L);
+        assertDoesNotThrow(() -> userValidator.validate(user));
+    }
+
+    @Test
+    void testValidateUserNull() {
+        assertThrows(IllegalArgumentException.class, () -> userValidator.validate(null));
+    }
+
+    @Test
+    void testValidateUserNameEmpty() {
+        User user = new User("", 1L);
+        assertThrows(IllegalArgumentException.class, () -> userValidator.validate(user));
+    }
+
+    @Test
+    void testValidateUserNameNull() {
+        User user = new User(null, 1L);
+        assertThrows(IllegalArgumentException.class, () -> userValidator.validate(user));
+    }
+}
+=== C:\Users\JM_14\-DOSW-Library\src\test\java\edu\eci\dosw\tdd\DoswLibraryApplicationTests.java ===
+package edu.eci.dosw.tdd;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class DoswLibraryApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
