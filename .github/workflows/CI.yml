@@ -4,6 +4,7 @@ on:
   pull_request:
     - Develop
     - main
+    - feature/reto6
 
 jobs:
 
