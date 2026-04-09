@@ -1,0 +1,53 @@
+package edu.eci.dosw.tdd.persistence.relational.repository;
+
+import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.core.repository.UserRepository;
+import edu.eci.dosw.tdd.persistence.relational.mapper.UserPersistenceMapper;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+@Profile("relational")
+public class UserRepositoryJpaImpl implements UserRepository {
+
+    private final JpaUserRepository repository;
+    private final UserPersistenceMapper mapper;
+
+    public UserRepositoryJpaImpl(JpaUserRepository repository, UserPersistenceMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    @Override
+    public User save(User user) {
+        return mapper.toModel(repository.save(mapper.toEntity(user)));
+    }
+
+    @Override
+    public Optional<User> findById(Long id) {
+        return repository.findById(id).map(mapper::toModel);
+    }
+
+    @Override
+    public Optional<User> findByUsername(String username) {
+        return repository.findByUsername(username).map(mapper::toModel);
+    }
+
+    @Override
+    public List<User> findAll() {
+        return repository.findAll().stream().map(mapper::toModel).toList();
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        repository.deleteById(id);
+    }
+
+    @Override
+    public boolean existsById(Long id) {
+        return repository.existsById(id);
+    }
+}

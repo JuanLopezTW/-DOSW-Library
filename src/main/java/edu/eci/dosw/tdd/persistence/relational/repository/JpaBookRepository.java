@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface BookRepository extends JpaRepository<BookEntity, Long> {
+public interface JpaBookRepository extends JpaRepository<BookEntity, Long> {
     List<BookEntity> findByAvailableCopiesGreaterThan(int copies);
 }

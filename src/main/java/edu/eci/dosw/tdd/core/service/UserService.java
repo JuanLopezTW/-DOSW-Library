@@ -3,9 +3,8 @@ package edu.eci.dosw.tdd.core.service;
 import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
 import edu.eci.dosw.tdd.core.model.Loan;
 import edu.eci.dosw.tdd.core.model.User;
-import edu.eci.dosw.tdd.persistence.relational.mapper.UserPersistenceMapper;
-import edu.eci.dosw.tdd.persistence.relational.repository.LoanRepository;
-import edu.eci.dosw.tdd.persistence.relational.repository.UserRepository;
+import edu.eci.dosw.tdd.core.repository.LoanRepository;
+import edu.eci.dosw.tdd.core.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -15,33 +14,28 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final UserPersistenceMapper userMapper;
     private final LoanRepository loanRepository;
-    private final PasswordEncoder passwordEncoder; // agrega esto
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, UserPersistenceMapper userMapper,
-                       LoanRepository loanRepository, PasswordEncoder passwordEncoder) { // agrega esto
+    public UserService(UserRepository userRepository, LoanRepository loanRepository,
+                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
-        this.userMapper = userMapper;
         this.loanRepository = loanRepository;
-        this.passwordEncoder = passwordEncoder; // agrega esto
+        this.passwordEncoder = passwordEncoder;
     }
 
     public void addUser(User user) {
-        user.setPassword(passwordEncoder.encode(user.getPassword())); // agrega esto
-        userRepository.save(userMapper.toEntity(user));
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        userRepository.save(user);
     }
 
     public User getUser(Long id) {
         return userRepository.findById(id)
-                .map(userMapper::toModel)
                 .orElseThrow(() -> new UserNotFoundException(id));
     }
 
     public List<User> getAllUsers() {
-        return userRepository.findAll().stream()
-                .map(userMapper::toModel)
-                .toList();
+        return userRepository.findAll();
     }
 
     public void deleteUser(Long id) {

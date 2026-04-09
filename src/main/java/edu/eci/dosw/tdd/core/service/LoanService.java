@@ -2,17 +2,11 @@ package edu.eci.dosw.tdd.core.service;
 
 import edu.eci.dosw.tdd.core.exception.LoanLimitExeededException;
 import edu.eci.dosw.tdd.core.exception.LoanNotFoundException;
-import edu.eci.dosw.tdd.core.model.Loan;
 import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.model.Loan;
 import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.core.repository.LoanRepository;
 import edu.eci.dosw.tdd.core.util.DateUtil;
-import edu.eci.dosw.tdd.persistence.relational.entity.BookEntity;
-import edu.eci.dosw.tdd.persistence.relational.entity.LoanEntity;
-import edu.eci.dosw.tdd.persistence.relational.entity.UserEntity;
-import edu.eci.dosw.tdd.persistence.relational.mapper.LoanPersistenceMapper;
-import edu.eci.dosw.tdd.persistence.relational.repository.BookRepository;
-import edu.eci.dosw.tdd.persistence.relational.repository.LoanRepository;
-import edu.eci.dosw.tdd.persistence.relational.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,18 +17,11 @@ public class LoanService {
     private static final int MAX_LOANS = 3;
 
     private final LoanRepository loanRepository;
-    private final BookRepository bookRepository;
-    private final UserRepository userRepository;
-    private final LoanPersistenceMapper loanMapper;
     private final BookService bookService;
     private final UserService userService;
 
-    public LoanService(LoanRepository loanRepository, BookRepository bookRepository,UserRepository userRepository, LoanPersistenceMapper loanMapper,
-                       BookService bookService, UserService userService) {
+    public LoanService(LoanRepository loanRepository, BookService bookService, UserService userService) {
         this.loanRepository = loanRepository;
-        this.bookRepository = bookRepository;
-        this.userRepository = userRepository;
-        this.loanMapper = loanMapper;
         this.bookService = bookService;
         this.userService = userService;
     }
@@ -48,39 +35,26 @@ public class LoanService {
 
         bookService.decreaseCopy(bookId);
 
-        UserEntity userEntity = userRepository.findById(userId).orElseThrow();
-        BookEntity bookEntity = bookRepository.findById(bookId).orElseThrow();
-
-        LoanEntity entity = new LoanEntity();
-        entity.setUser(userEntity);
-        entity.setBook(bookEntity);
-        entity.setLoanDate(DateUtil.today());
-        entity.setStatus(Loan.LoanStatus.ACTIVE.name());
-        loanRepository.save(entity);
-
-        return loanMapper.toModel(entity);
+        Loan loan = new Loan(book, user, DateUtil.today(), Loan.LoanStatus.ACTIVE, null);
+        return loanRepository.save(loan);
     }
 
     public void returnLoan(Long userId, Long bookId) {
-        LoanEntity entity = loanRepository
+        Loan loan = loanRepository
                 .findByUserIdAndBookIdAndStatus(userId, bookId, Loan.LoanStatus.ACTIVE.name())
-                .orElseThrow(() -> new LoanNotFoundException());
+                .orElseThrow(LoanNotFoundException::new);
 
-        entity.setStatus(Loan.LoanStatus.RETURNED.name());
-        entity.setReturnDate(DateUtil.today());
-        loanRepository.save(entity);
+        loan.setStatus(Loan.LoanStatus.RETURNED);
+        loan.setReturnDate(DateUtil.today());
+        loanRepository.save(loan);
         bookService.increaseCopy(bookId);
     }
 
     public List<Loan> getAllLoans() {
-        return loanRepository.findAll().stream()
-                .map(loanMapper::toModel)
-                .toList();
+        return loanRepository.findAll();
     }
 
     public List<Loan> getLoansByUser(Long userId) {
-        return loanRepository.findByUserId(userId).stream()
-                .map(loanMapper::toModel)
-                .toList();
+        return loanRepository.findByUserId(userId);
     }
 }

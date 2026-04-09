@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface LoanRepository extends JpaRepository<LoanEntity, Long> {
+public interface JpaLoanRepository extends JpaRepository<LoanEntity, Long> {
     List<LoanEntity> findByUserId(Long userId);
     List<LoanEntity> findByUserIdAndStatus(Long userId, String status);
     Optional<LoanEntity> findByUserIdAndBookIdAndStatus(Long userId, Long bookId, String status);
