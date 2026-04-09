@@ -2,9 +2,14 @@ name: CI/CD Pipeline
 
 on:
   pull_request:
-    - Develop
-    - main
-    - feature/reto6
+    branches:
+      - develop
+      - main
+    push:
+      branches:
+        - develop
+        - main
+        - feature/reto6
 
 jobs:
 
