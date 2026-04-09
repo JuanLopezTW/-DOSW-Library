@@ -1,4 +1,4 @@
-package edu.eci.dosw.tdd.persistence.entity;
+package edu.eci.dosw.tdd.persistence.relational.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -9,27 +9,22 @@ import lombok.AllArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "users")
-public class UserEntity {
+@Table(name = "books")
+public class BookEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String name;
-
-    @Column(nullable = false, unique = true)
-    private String username;
+    private String title;
 
     @Column(nullable = false)
-    private String password;
+    private String author;
 
     @Column(nullable = false)
-    @Enumerated(EnumType.STRING)
-    private Role role;
+    private Integer totalCopies;
 
-    public enum Role {
-        USER, LIBRARIAN
-    }
+    @Column(nullable = false)
+    private Integer availableCopies;
 }
