@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: mongo
   datasource:
     url: jdbc:postgresql://localhost:5432/library
     username: postgres
@@ -16,7 +18,7 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
   data:
     mongodb:
-      uri: mongodb+srv://gameepic730_db_user:58r5UB8MVHPMb9Dd@cluster0.7s3vru1.mongodb.net/?appName=Cluster0
+      uri: mongodb+srv://gameepic730_db_user:58r5UB8MVHPMb9Dd@cluster0.7s3vru1.mongodb.net/library?retryWrites=true&w=majority&appName=Cluster0
 
 springdoc:
   api-docs:
